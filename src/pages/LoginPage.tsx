@@ -48,14 +48,14 @@ export function LoginPage() {
       <main className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-12 lg:flex-row lg:items-start lg:justify-between lg:py-16">
         <section className="max-w-xl space-y-6">
           <span className="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">
-            Acesso à API Mercado Livre
+            Painel do vendedor
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-blue-950 lg:text-5xl">
-            Entre para conectar sua conta
+            Entre para gerenciar seus anúncios
           </h1>
           <p className="text-lg text-slate-600">
-            Use o mesmo e-mail e senha cadastrados na API. Após o login, você
-            poderá autorizar o Mercado Livre com um único clique.
+            Plataforma para vendedores integrados ao Mercado Livre. Publique e
+            gerencie produtos.
           </p>
         </section>
 

@@ -59,14 +59,14 @@ export function RegisterPage() {
       <main className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-12 lg:flex-row lg:items-start lg:justify-between lg:py-16">
         <section className="max-w-xl space-y-6">
           <span className="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">
-            Novo usuário
+            Cadastro de vendedor
           </span>
           <h1 className="text-4xl font-bold tracking-tight text-blue-950 lg:text-5xl">
-            Crie sua conta na API
+            Crie sua conta de vendedor
           </h1>
           <p className="text-lg text-slate-600">
-            Cadastro rápido com nome, e-mail e senha (mínimo 6 caracteres).
-            Depois você faz login e conecta o Mercado Livre quando quiser.
+            Cadastro rápido com nome, e-mail e senha. Depois do login, conecte o
+            Mercado Livre e publique seus produtos.
           </p>
 
         </section>
