@@ -36,7 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await refreshMe()
       } catch {
-        // falha de rede ou servidor indisponível ao iniciar
       } finally {
         if (!cancelled) setLoading(false)
       }

@@ -1,4 +1,5 @@
 import { apiJson } from './api'
+import type { PredictCategoryResponse } from '../types/category'
 import type { CreateItemPayload, Item, UpdateItemPayload } from '../types/item'
 import type { ItemListFilters } from '../types/item-filters'
 
@@ -15,6 +16,11 @@ export async function fetchItems(filters: ItemListFilters) {
   const qs = params.toString()
   const data = await apiJson<{ items: Item[] }>(`/items${qs ? `?${qs}` : ''}`)
   return data.items
+}
+
+export async function predictCategoryFromTitle(title: string, site = 'MLB') {
+  const params = new URLSearchParams({ q: title.trim(), site })
+  return apiJson<PredictCategoryResponse>(`/items/categories/predict?${params.toString()}`)
 }
 
 export async function fetchItem(id: string) {

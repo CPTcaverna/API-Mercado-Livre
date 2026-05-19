@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ApiError } from '../lib/api'
-import { createItem, updateItem } from '../lib/items-api'
+import { createItem, predictCategoryFromTitle, updateItem } from '../lib/items-api'
 import type { Item } from '../types/item'
 import Button from './Button'
 import { FieldLabel } from './FieldLabel'
@@ -23,6 +23,12 @@ const LISTING_TYPES = [
   { value: 'free', label: 'Grátis' },
 ]
 
+const FORM_CONTROL_CLASS =
+  'mt-1 box-border h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40'
+
+const PRICE_GROUP_CLASS =
+  'mt-1 box-border flex h-10 w-full overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-500/40'
+
 export function ItemFormModal({
   open,
   mode,
@@ -34,6 +40,8 @@ export function ItemFormModal({
 
   const [title, setTitle] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [categoryName, setCategoryName] = useState<string | null>(null)
+  const [predictingCategory, setPredictingCategory] = useState(false)
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
   const [condition, setCondition] = useState<'new' | 'used' | 'not_specified'>('new')
@@ -54,6 +62,7 @@ export function ItemFormModal({
     } else if (!isEdit) {
       setTitle('')
       setCategoryId('')
+      setCategoryName(null)
       setPrice('')
       setQuantity('')
       setCondition('new')
@@ -63,6 +72,37 @@ export function ItemFormModal({
       setModel('')
     }
   }, [open, isEdit, item])
+
+  async function handlePredictCategory() {
+    const term = title.trim()
+    if (term.length < 3) {
+      setError('Digite um título com pelo menos 3 caracteres.')
+      return
+    }
+    setPredictingCategory(true)
+    setError(null)
+    try {
+      const result = await predictCategoryFromTitle(term)
+      if (!result.predicted) {
+        setCategoryId('')
+        setCategoryName(null)
+        setError('Nenhuma categoria encontrada para este título. Ajuste o texto e tente de novo.')
+        return
+      }
+      setCategoryId(result.predicted.category_id)
+      setCategoryName(result.predicted.category_name)
+    } catch (err) {
+      setCategoryId('')
+      setCategoryName(null)
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Não foi possível prever a categoria.',
+      )
+    } finally {
+      setPredictingCategory(false)
+    }
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -79,6 +119,11 @@ export function ItemFormModal({
           available_quantity: parsedQty,
         })
       } else {
+        if (!categoryId.trim()) {
+          setError('Clique em "Prever categoria" após preencher o título.')
+          setSubmitting(false)
+          return
+        }
         await createItem({
           title: title.trim(),
           category_id: categoryId.trim(),
@@ -111,58 +156,91 @@ export function ItemFormModal({
       wide={!isEdit}
       title={isEdit ? 'Editar anúncio' : 'Novo anúncio no Mercado Livre'}
     >
-      <form className="space-y-4" onSubmit={onSubmit}>
+      <form className="space-y-3" onSubmit={onSubmit}>
         <div>
-          <FieldLabel>Título</FieldLabel>
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Produto Exemplo"
-            required
-            minLength={3}
-          />
+          <FieldLabel>Título do anúncio</FieldLabel>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="min-w-0 flex-1">
+              <Input
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value)
+                  if (categoryId) {
+                    setCategoryId('')
+                    setCategoryName(null)
+                  }
+                }}
+                onBlur={() => {
+                  if (!isEdit && title.trim().length >= 3 && !categoryId) {
+                    void handlePredictCategory()
+                  }
+                }}
+                placeholder="Notebook Dell Inspiron 15"
+                required
+                minLength={3}
+                disabled={submitting || predictingCategory}
+              />
+            </div>
+            {!isEdit && (
+              <button
+                type="button"
+                onClick={() => void handlePredictCategory()}
+                disabled={submitting || predictingCategory || title.trim().length < 3}
+                className="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-60"
+              >
+                {predictingCategory ? 'Prevendo…' : 'Prever categoria'}
+              </button>
+            )}
+          </div>
+          {!isEdit && (
+            <p className="mt-2 text-xs text-slate-500">
+              A categoria é sugerida pelo Mercado Livre com base no título (API domain_discovery).
+            </p>
+          )}
+          {!isEdit && categoryName && categoryId && (
+            <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+              Categoria sugerida: <strong>{categoryName}</strong> ({categoryId})
+            </p>
+          )}
         </div>
 
         {!isEdit && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel>Categoria (ID ML)</FieldLabel>
-                <Input
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  placeholder="MLB3530"
-                  required
-                />
-              </div>
-              <div>
-                <FieldLabel>Tipo de anúncio</FieldLabel>
-                <select
-                  value={listingTypeId}
-                  onChange={(e) => setListingTypeId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40"
-                >
-                  {LISTING_TYPES.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <FieldLabel>Tipo de anúncio</FieldLabel>
+              <select
+                value={listingTypeId}
+                onChange={(e) => setListingTypeId(e.target.value)}
+                className={FORM_CONTROL_CLASS}
+              >
+                {LISTING_TYPES.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <FieldLabel>Preço (R$)</FieldLabel>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="99.90"
-                  required
-                />
+                <FieldLabel >
+                  Preço
+                </FieldLabel>
+                <div className={PRICE_GROUP_CLASS}>
+                  <span className="flex h-full shrink-0 items-center border-r border-slate-200 bg-slate-100 px-3 text-sm font-medium text-slate-600">
+                    R$
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="99.90"
+                    required
+                    className="min-w-0 flex-1 border-0 bg-transparent px-3 text-sm text-slate-900 outline-none"
+                  />
+                </div>
               </div>
               <div>
                 <FieldLabel>Estoque</FieldLabel>
@@ -182,7 +260,7 @@ export function ItemFormModal({
                   onChange={(e) =>
                     setCondition(e.target.value as 'new' | 'used' | 'not_specified')
                   }
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40"
+                  className={FORM_CONTROL_CLASS}
                 >
                   <option value="new">Novo</option>
                   <option value="used">Usado</option>
@@ -213,7 +291,7 @@ export function ItemFormModal({
             </div>
 
             <div>
-              <FieldLabel hint="URL pública da imagem">Foto (URL)</FieldLabel>
+              <FieldLabel hint="HTTPS, domínio público, sem login">Foto (URL)</FieldLabel>
               <Input
                 type="url"
                 value={pictureUrl}
@@ -221,6 +299,12 @@ export function ItemFormModal({
                 placeholder="https://http2.mlstatic.com/..."
                 required
               />
+              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                Use uma URL de imagem em <strong>domínio público na internet</strong> (HTTPS).
+                O Mercado Livre baixa a foto dos servidores deles — links locais, Google Drive
+                com restrição ou páginas que exigem login <strong>não funcionam</strong>.
+                Recomendado: PNG ou JPEG, pelo menos 500×500 px.
+              </p>
             </div>
           </>
         )}
@@ -275,6 +359,3 @@ export function ItemFormModal({
     </Modal>
   )
 }
-
-
-
