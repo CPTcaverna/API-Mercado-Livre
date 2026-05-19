@@ -1,4 +1,5 @@
 import { apiJson } from './api'
+import type { CategoryAttributesResponse } from '../types/category-attribute'
 import type { PredictCategoryResponse } from '../types/category'
 import type { CreateItemPayload, Item, UpdateItemPayload } from '../types/item'
 import type { ItemListFilters } from '../types/item-filters'
@@ -21,6 +22,30 @@ export async function fetchItems(filters: ItemListFilters) {
 export async function predictCategoryFromTitle(title: string, site = 'MLB') {
   const params = new URLSearchParams({ q: title.trim(), site })
   return apiJson<PredictCategoryResponse>(`/items/categories/predict?${params.toString()}`)
+}
+
+export async function fetchCategoryAttributes(categoryId: string) {
+  return apiJson<CategoryAttributesResponse>(
+    `/items/categories/${encodeURIComponent(categoryId)}/attributes`,
+  )
+}
+
+export async function resolveCategoryAttributes(
+  categoryId: string,
+  payload: {
+    title?: string
+    condition?: string
+    listing_type_id?: string
+    attributes: { id: string; value_id?: string; value_name?: string }[]
+  },
+) {
+  return apiJson<CategoryAttributesResponse>(
+    `/items/categories/${encodeURIComponent(categoryId)}/attributes/resolve`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+  )
 }
 
 export async function fetchItem(id: string) {

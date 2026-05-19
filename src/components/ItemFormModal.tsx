@@ -1,8 +1,24 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../lib/api'
-import { createItem, predictCategoryFromTitle, updateItem } from '../lib/items-api'
+import {
+  createItem,
+  fetchCategoryAttributes,
+  predictCategoryFromTitle,
+  resolveCategoryAttributes,
+  updateItem,
+} from '../lib/items-api'
+import {
+  formatAttributeValueForMl,
+  getAttributeValidationMessage,
+  isAttributeValueFilled,
+} from '../lib/category-attribute-value'
+import type {
+  CategoryAttribute,
+  CategoryAttributeValue,
+} from '../types/category-attribute'
 import type { Item } from '../types/item'
 import Button from './Button'
+import { CategoryAttributeFields } from './CategoryAttributeFields'
 import { FieldLabel } from './FieldLabel'
 import Input from './Input'
 import { Modal } from './Modal'
@@ -47,14 +63,31 @@ export function ItemFormModal({
   const [condition, setCondition] = useState<'new' | 'used' | 'not_specified'>('new')
   const [listingTypeId, setListingTypeId] = useState('silver')
   const [pictureUrl, setPictureUrl] = useState('')
-  const [brand, setBrand] = useState('')
-  const [model, setModel] = useState('')
+  const [requiredAttributes, setRequiredAttributes] = useState<CategoryAttribute[]>(
+    [],
+  )
+  const [attributeValues, setAttributeValues] = useState<
+    Record<string, CategoryAttributeValue>
+  >({})
+  const [loadingAttributes, setLoadingAttributes] = useState(false)
+  const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current)
+      setLoadingAttributes(false)
+      setPredictingCategory(false)
+      setSubmitting(false)
+      return
+    }
+
     setError(null)
+    setLoadingAttributes(false)
+    setPredictingCategory(false)
+    setSubmitting(false)
+
     if (isEdit && item) {
       setTitle(item.title)
       setPrice(String(item.price))
@@ -68,10 +101,122 @@ export function ItemFormModal({
       setCondition('new')
       setListingTypeId('silver')
       setPictureUrl('')
-      setBrand('')
-      setModel('')
+      setRequiredAttributes([])
+      setAttributeValues({})
     }
   }, [open, isEdit, item])
+
+  useEffect(() => {
+    if (!open || isEdit || !categoryId.trim()) {
+      setRequiredAttributes([])
+      setAttributeValues({})
+      setLoadingAttributes(false)
+      return
+    }
+
+    let cancelled = false
+    setLoadingAttributes(true)
+    setError(null)
+    ;(async () => {
+      try {
+        const { required } = await fetchCategoryAttributes(categoryId.trim())
+        if (cancelled) return
+        setRequiredAttributes(required)
+        setAttributeValues({})
+      } catch (err) {
+        if (cancelled) return
+        setRequiredAttributes([])
+        setAttributeValues({})
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'Não foi possível carregar os atributos da categoria.',
+        )
+      } finally {
+        if (!cancelled) setLoadingAttributes(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      setLoadingAttributes(false)
+    }
+  }, [open, isEdit, categoryId])
+
+  useEffect(() => {
+    if (!open || isEdit || !categoryId.trim() || requiredAttributes.length === 0) {
+      return
+    }
+
+    if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current)
+    resolveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const draft = buildAttributesPayload()
+          const result = await resolveCategoryAttributes(categoryId.trim(), {
+            title: title.trim(),
+            condition,
+            listing_type_id: listingTypeId,
+            attributes: draft,
+          })
+          setRequiredAttributes((prev) => {
+            const prevIds = prev
+              .map((a) => a.id)
+              .sort()
+              .join(',')
+            const nextIds = result.required
+              .map((a) => a.id)
+              .sort()
+              .join(',')
+            return prevIds === nextIds ? prev : result.required
+          })
+        } catch {
+          // Mantém lista atual se a validação condicional falhar.
+        }
+      })()
+    }, 500)
+
+    return () => {
+      if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current)
+    }
+  }, [open, isEdit, categoryId, title, condition, listingTypeId, attributeValues])
+
+  function handleAttributeChange(id: string, value: CategoryAttributeValue) {
+    setAttributeValues((prev) => {
+      const next = { ...prev, [id]: value }
+      if (id === 'PROCESSOR_BRAND') {
+        delete next.PROCESSOR_LINE
+        delete next.PROCESSOR_MODEL
+      }
+      if (id === 'BRAND') {
+        delete next.MODEL
+        delete next.RAM
+        delete next.INTERNAL_MEMORY
+      }
+      if (id === 'MODEL') {
+        delete next.RAM
+        delete next.INTERNAL_MEMORY
+      }
+      return next
+    })
+  }
+
+  function buildAttributesPayload() {
+    return requiredAttributes
+      .map((attr) => {
+        const formatted = formatAttributeValueForMl(
+          attr,
+          attributeValues[attr.id] ?? {},
+        )
+        if (!formatted) return null
+        return {
+          id: attr.id,
+          ...(formatted.value_id ? { value_id: formatted.value_id } : {}),
+          ...(formatted.value_name ? { value_name: formatted.value_name } : {}),
+        }
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+  }
 
   async function handlePredictCategory() {
     const term = title.trim()
@@ -124,6 +269,26 @@ export function ItemFormModal({
           setSubmitting(false)
           return
         }
+        if (loadingAttributes) {
+          setError('Aguarde o carregamento dos atributos da categoria.')
+          setSubmitting(false)
+          return
+        }
+        const missing = requiredAttributes.filter(
+          (attr) => !isAttributeValueFilled(attr, attributeValues[attr.id]),
+        )
+        if (missing.length > 0) {
+          const detail = getAttributeValidationMessage(
+            missing[0],
+            attributeValues[missing[0].id],
+          )
+          setError(
+            detail ??
+              `Preencha os campos obrigatórios: ${missing.map((a) => a.name).join(', ')}.`,
+          )
+          setSubmitting(false)
+          return
+        }
         await createItem({
           title: title.trim(),
           category_id: categoryId.trim(),
@@ -132,10 +297,7 @@ export function ItemFormModal({
           condition,
           listing_type_id: listingTypeId,
           pictures: [{ source: pictureUrl.trim() }],
-          attributes: [
-            { id: 'BRAND', value_name: brand.trim() },
-            { id: 'MODEL', value_name: model.trim() },
-          ],
+          attributes: buildAttributesPayload(),
         })
       }
       onSuccess()
@@ -168,6 +330,8 @@ export function ItemFormModal({
                   if (categoryId) {
                     setCategoryId('')
                     setCategoryName(null)
+                    setRequiredAttributes([])
+                    setAttributeValues({})
                   }
                 }}
                 onBlur={() => {
@@ -269,26 +433,17 @@ export function ItemFormModal({
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel>Marca (BRAND)</FieldLabel>
-                <Input
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  placeholder="Genérica"
-                  required
-                />
-              </div>
-              <div>
-                <FieldLabel>Modelo (MODEL)</FieldLabel>
-                <Input
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="Padrão"
-                  required
-                />
-              </div>
-            </div>
+            {loadingAttributes && categoryId && (
+              <p className="text-sm text-slate-500">Carregando atributos da categoria…</p>
+            )}
+            {!loadingAttributes && requiredAttributes.length > 0 && (
+              <CategoryAttributeFields
+                attributes={requiredAttributes}
+                values={attributeValues}
+                onChange={handleAttributeChange}
+                disabled={submitting}
+              />
+            )}
 
             <div>
               <FieldLabel hint="HTTPS, domínio público, sem login">Foto (URL)</FieldLabel>
@@ -351,7 +506,7 @@ export function ItemFormModal({
             <Button
               type="submit"
               title={submitting ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Publicar'}
-              disabled={submitting}
+              disabled={submitting || loadingAttributes}
             />
           </div>
         </div>
