@@ -33,16 +33,14 @@ export function ItemFormModal({
   const isEdit = mode === 'edit'
 
   const [title, setTitle] = useState('')
-  const [categoryId, setCategoryId] = useState('MLB3530')
+  const [categoryId, setCategoryId] = useState('')
   const [price, setPrice] = useState('')
-  const [quantity, setQuantity] = useState('1')
+  const [quantity, setQuantity] = useState('')
   const [condition, setCondition] = useState<'new' | 'used' | 'not_specified'>('new')
   const [listingTypeId, setListingTypeId] = useState('silver')
-  const [pictureUrl, setPictureUrl] = useState(
-    'https://http2.mlstatic.com/D_604015-MLA50044620282_052022-O.jpg',
-  )
-  const [brand, setBrand] = useState('Genérica')
-  const [model, setModel] = useState('Padrão')
+  const [pictureUrl, setPictureUrl] = useState('')
+  const [brand, setBrand] = useState('')
+  const [model, setModel] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,16 +53,14 @@ export function ItemFormModal({
       setQuantity(String(item.availableQty))
     } else if (!isEdit) {
       setTitle('')
-      setCategoryId('MLB3530')
+      setCategoryId('')
       setPrice('')
-      setQuantity('1')
+      setQuantity('')
       setCondition('new')
       setListingTypeId('silver')
-      setPictureUrl(
-        'https://http2.mlstatic.com/D_604015-MLA50044620282_052022-O.jpg',
-      )
-      setBrand('Genérica')
-      setModel('Padrão')
+      setPictureUrl('')
+      setBrand('')
+      setModel('')
     }
   }, [open, isEdit, item])
 
@@ -135,6 +131,7 @@ export function ItemFormModal({
                 <Input
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
+                  placeholder="MLB3530"
                   required
                 />
               </div>
@@ -163,6 +160,7 @@ export function ItemFormModal({
                   min="0.01"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
+                  placeholder="99.90"
                   required
                 />
               </div>
@@ -173,6 +171,7 @@ export function ItemFormModal({
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  placeholder="1"
                   required
                 />
               </div>
@@ -195,11 +194,21 @@ export function ItemFormModal({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <FieldLabel>Marca (BRAND)</FieldLabel>
-                <Input value={brand} onChange={(e) => setBrand(e.target.value)} required />
+                <Input
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  placeholder="Genérica"
+                  required
+                />
               </div>
               <div>
                 <FieldLabel>Modelo (MODEL)</FieldLabel>
-                <Input value={model} onChange={(e) => setModel(e.target.value)} required />
+                <Input
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Padrão"
+                  required
+                />
               </div>
             </div>
 
@@ -209,6 +218,7 @@ export function ItemFormModal({
                 type="url"
                 value={pictureUrl}
                 onChange={(e) => setPictureUrl(e.target.value)}
+                placeholder="https://http2.mlstatic.com/..."
                 required
               />
             </div>

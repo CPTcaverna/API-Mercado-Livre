@@ -13,6 +13,7 @@ type ProductDetailModalProps = {
   onEdit: (item: Item) => void
   onDeactivate: (item: Item) => void
   onReactivate: (item: Item) => void
+  onDelete: (item: Item) => void
 }
 
 function formatDate(iso: string) {
@@ -29,6 +30,7 @@ export function ProductDetailModal({
   onEdit,
   onDeactivate,
   onReactivate,
+  onDelete,
 }: ProductDetailModalProps) {
   const [item, setItem] = useState<Item | null>(null)
   const [loading, setLoading] = useState(false)
@@ -167,13 +169,22 @@ export function ProductDetailModal({
                 </button>
               </>
             ) : (
-              <button
-                type="button"
-                onClick={() => void onReactivate(item)}
-                className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
-              >
-                Reativar
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => void onReactivate(item)}
+                  className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+                >
+                  Reativar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onDelete(item)}
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                >
+                  Excluir
+                </button>
+              </>
             )}
           </div>
         </div>

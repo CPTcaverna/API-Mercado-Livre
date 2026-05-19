@@ -1,9 +1,16 @@
 import { apiJson } from './api'
 import type { CreateItemPayload, Item, UpdateItemPayload } from '../types/item'
 
-export async function fetchItems(includeInactive = false) {
-  const q = includeInactive ? '?includeInactive=true' : ''
-  const data = await apiJson<{ items: Item[] }>(`/items${q}`)
+export async function fetchItems(
+  includeInactive = false,
+  search = '',
+) {
+  const params = new URLSearchParams()
+  if (includeInactive) params.set('includeInactive', 'true')
+  const term = search.trim()
+  if (term) params.set('q', term)
+  const qs = params.toString()
+  const data = await apiJson<{ items: Item[] }>(`/items${qs ? `?${qs}` : ''}`)
   return data.items
 }
 
@@ -40,4 +47,24 @@ export async function reactivateItem(id: string) {
     method: 'POST',
   })
   return data.item
+}
+
+export async function deleteInactiveItem(id: string) {
+  await apiJson<{ ok: boolean }>(`/items/${id}/permanent`, {
+    method: 'DELETE',
+  })
+}
+
+export type ImportFromMlResult = {
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+  totalOnMercadoLivre: number
+  processed: number
+  errors: string[]
+}
+
+export async function importItemsFromMercadoLivre() {
+  return apiJson<ImportFromMlResult>('/items/import', { method: 'POST' })
 }
