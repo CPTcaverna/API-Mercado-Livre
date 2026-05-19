@@ -41,7 +41,6 @@ export async function apiJson<T>(
   if (!headers.has('Content-Type') && init?.body != null) {
     headers.set('Content-Type', 'application/json')
   }
-
   const res = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     credentials: 'include',

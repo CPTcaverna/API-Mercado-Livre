@@ -46,16 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshMe])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const data = await apiJson<{ user: AuthUser }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    })
-    setUser({
-      ...data.user,
-      mlConnected: data.user.mlConnected ?? false,
-    })
-  }, [])
+  const login = useCallback(
+    async (email: string, password: string) => {
+      await apiJson<{ user: AuthUser }>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+      await refreshMe()
+    },
+    [refreshMe],
+  )
 
   const register = useCallback(
     async (name: string, email: string, password: string) => {
