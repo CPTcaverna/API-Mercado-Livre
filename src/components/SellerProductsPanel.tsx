@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApiError } from '../lib/api'
 import { formatBrl } from '../lib/format'
-import Input from './Input'
 import {
   deactivateItem,
   deleteInactiveItem,
@@ -10,7 +9,13 @@ import {
   reactivateItem,
 } from '../lib/items-api'
 import type { Item } from '../types/item'
+import {
+  DEFAULT_ITEM_LIST_FILTERS,
+  hasActiveItemFilters,
+  type ItemListFilters,
+} from '../types/item-filters'
 import { ItemFormModal } from './ItemFormModal'
+import { ItemListFiltersBar } from './ItemListFilters'
 import { ProductDetailModal } from './ProductDetailModal'
 
 type ModalState =
@@ -20,28 +25,29 @@ type ModalState =
 
 export function SellerProductsPanel() {
   const [items, setItems] = useState<Item[]>([])
-  const [includeInactive, setIncludeInactive] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
+  const [appliedFilters, setAppliedFilters] =
+    useState<ItemListFilters>(DEFAULT_ITEM_LIST_FILTERS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
   const [modal, setModal] = useState<ModalState>({ type: 'closed' })
   const [viewItemId, setViewItemId] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDebouncedSearch(search.trim())
+      const q = searchInput.trim()
+      setAppliedFilters((prev) => (prev.q === q ? prev : { ...prev, q }))
     }, 400)
     return () => window.clearTimeout(timer)
-  }, [search])
+  }, [searchInput])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const list = await fetchItems(includeInactive, debouncedSearch)
+      const list = await fetchItems(appliedFilters)
       setItems(list)
     } catch (err) {
       setError(
@@ -50,11 +56,17 @@ export function SellerProductsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [includeInactive, debouncedSearch])
+  }, [appliedFilters])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  function handleApplyModalFilters(
+    modalFilters: Pick<ItemListFilters, 'visibility' | 'status' | 'stock' | 'sort'>,
+  ) {
+    setAppliedFilters((prev) => ({ ...prev, ...modalFilters }))
+  }
 
   async function handleDeactivate(item: Item) {
     if (!confirm(`Inativar "${item.title}" no Mercado Livre?`)) return
@@ -157,37 +169,23 @@ export function SellerProductsPanel() {
         </div>
       </div>
 
-      <div className="space-y-3 border-b border-slate-50 px-6 py-3">
-        <div className="max-w-md">
-          <label htmlFor="item-search" className="sr-only">
-            Buscar anúncios
-          </label>
-          <Input
-            id="item-search"
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por título ou ID (MLB…)"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-              className="rounded border-slate-300"
-            />
-            Mostrar inativos
-          </label>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="text-sm font-medium text-blue-900 hover:underline"
-          >
-            Atualizar lista
-          </button>
-        </div>
+      <ItemListFiltersBar
+        search={searchInput}
+        onSearchChange={setSearchInput}
+        appliedFilters={appliedFilters}
+        onApplyFilters={handleApplyModalFilters}
+        resultCount={items.length}
+        loading={loading}
+      />
+
+      <div className="flex justify-end border-b border-slate-50 px-6 py-2">
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="text-sm font-medium text-blue-900 hover:underline"
+        >
+          Atualizar lista
+        </button>
       </div>
 
       {error && (
@@ -200,8 +198,8 @@ export function SellerProductsPanel() {
         <p className="p-8 text-center text-sm text-slate-500">Carregando anúncios…</p>
       ) : items.length === 0 ? (
         <p className="p-8 text-center text-sm text-slate-500">
-          {debouncedSearch
-            ? `Nenhum anúncio encontrado para "${debouncedSearch}".`
+          {appliedFilters.q || hasActiveItemFilters(appliedFilters)
+            ? 'Nenhum anúncio corresponde aos filtros selecionados.'
             : 'Nenhum anúncio ainda. Clique em "Novo produto" para publicar.'}
         </p>
       ) : (

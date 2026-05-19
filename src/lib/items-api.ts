@@ -1,14 +1,17 @@
 import { apiJson } from './api'
 import type { CreateItemPayload, Item, UpdateItemPayload } from '../types/item'
+import type { ItemListFilters } from '../types/item-filters'
 
-export async function fetchItems(
-  includeInactive = false,
-  search = '',
-) {
+export async function fetchItems(filters: ItemListFilters) {
   const params = new URLSearchParams()
-  if (includeInactive) params.set('includeInactive', 'true')
-  const term = search.trim()
+  const term = filters.q.trim()
   if (term) params.set('q', term)
+  if (filters.visibility !== 'active') {
+    params.set('visibility', filters.visibility)
+  }
+  if (filters.status !== 'all') params.set('status', filters.status)
+  if (filters.stock !== 'all') params.set('stock', filters.stock)
+  if (filters.sort !== 'newest') params.set('sort', filters.sort)
   const qs = params.toString()
   const data = await apiJson<{ items: Item[] }>(`/items${qs ? `?${qs}` : ''}`)
   return data.items

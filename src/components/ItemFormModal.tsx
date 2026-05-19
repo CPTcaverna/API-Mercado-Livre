@@ -127,7 +127,7 @@ export function ItemFormModal({
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <FieldLabel hint="Ex.: MLB3530">Categoria (ID ML)</FieldLabel>
+                <FieldLabel>Categoria (ID ML)</FieldLabel>
                 <Input
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
