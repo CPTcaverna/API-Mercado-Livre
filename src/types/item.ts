@@ -10,6 +10,21 @@ export type Item = {
   categoryId: string | null
   createdAt: string
   updatedAt: string
+  permalink?: string | null
+  condition?: string | null
+  listingTypeId?: string | null
+  currencyId?: string | null
+  categoryName?: string | null
+  soldQuantity?: number | null
+  pictures?: string[]
+  attributes?: ItemDetailAttribute[]
+}
+
+export type ItemDetailAttribute = {
+  id: string
+  name: string
+  value_name?: string
+  value_id?: string
 }
 
 export type ItemAttributePayload = {
