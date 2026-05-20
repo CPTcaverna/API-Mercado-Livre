@@ -9,6 +9,7 @@ import {
   reactivateItem,
 } from '../lib/items-api'
 import type { Item } from '../types/item'
+import { ITEM_LIST_PAGE_SIZE } from '../types/item-list'
 import {
   DEFAULT_ITEM_LIST_FILTERS,
   hasActiveItemFilters,
@@ -16,6 +17,7 @@ import {
 } from '../types/item-filters'
 import { ItemFormModal } from './ItemFormModal'
 import { ItemListFiltersBar } from './ItemListFilters'
+import { ItemListPagination } from './ItemListPagination'
 import { ProductDetailModal } from './ProductDetailModal'
 
 type ModalState =
@@ -25,6 +27,9 @@ type ModalState =
 
 export function SellerProductsPanel() {
   const [items, setItems] = useState<Item[]>([])
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [appliedFilters, setAppliedFilters] =
     useState<ItemListFilters>(DEFAULT_ITEM_LIST_FILTERS)
@@ -38,7 +43,11 @@ export function SellerProductsPanel() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const q = searchInput.trim()
-      setAppliedFilters((prev) => (prev.q === q ? prev : { ...prev, q }))
+      setAppliedFilters((prev) => {
+        if (prev.q === q) return prev
+        setPage(1)
+        return { ...prev, q }
+      })
     }, 400)
     return () => window.clearTimeout(timer)
   }, [searchInput])
@@ -47,8 +56,13 @@ export function SellerProductsPanel() {
     setLoading(true)
     setError(null)
     try {
-      const list = await fetchItems(appliedFilters)
-      setItems(list)
+      const data = await fetchItems(appliedFilters, page)
+      setItems(data.items)
+      setTotal(data.total)
+      setTotalPages(data.totalPages)
+      if (data.page !== page) {
+        setPage(data.page)
+      }
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : 'Não foi possível carregar anúncios.',
@@ -56,7 +70,7 @@ export function SellerProductsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [appliedFilters])
+  }, [appliedFilters, page])
 
   useEffect(() => {
     void load()
@@ -65,6 +79,7 @@ export function SellerProductsPanel() {
   function handleApplyModalFilters(
     modalFilters: Pick<ItemListFilters, 'visibility' | 'status' | 'stock' | 'sort'>,
   ) {
+    setPage(1)
     setAppliedFilters((prev) => ({ ...prev, ...modalFilters }))
   }
 
@@ -174,7 +189,7 @@ export function SellerProductsPanel() {
         onSearchChange={setSearchInput}
         appliedFilters={appliedFilters}
         onApplyFilters={handleApplyModalFilters}
-        resultCount={items.length}
+        resultCount={total}
         loading={loading}
       />
 
@@ -302,6 +317,14 @@ export function SellerProductsPanel() {
               ))}
             </tbody>
           </table>
+          <ItemListPagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={ITEM_LIST_PAGE_SIZE}
+            onPageChange={setPage}
+            disabled={loading}
+          />
         </div>
       )}
 

@@ -2,6 +2,11 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ApiError } from '../lib/api'
+import {
+  isStrongPassword,
+  STRONG_PASSWORD_ERROR,
+  STRONG_PASSWORD_HINT,
+} from '../lib/password'
 import { useAuth } from '../context/useAuth'
 import Input from '../components/Input'
 import Button from '../components/Button'
@@ -25,8 +30,12 @@ export function RegisterPage() {
       return;
     }
     if (password !== confirmPassword) {
-      setError("As senhas não coincidem");
-      return;
+      setError('As senhas não coincidem.')
+      return
+    }
+    if (!isStrongPassword(password)) {
+      setError(STRONG_PASSWORD_ERROR)
+      return
     }
 
     setSubmitting(true)
@@ -110,9 +119,7 @@ export function RegisterPage() {
                 value={confirmPassword}
               />
 
-              <p className="mt-1 text-xs text-slate-500">
-                Pelo menos 6 caracteres.
-              </p>
+              <p className="mt-1 text-xs text-slate-500">{STRONG_PASSWORD_HINT}</p>
             </div>
 
             {error && (

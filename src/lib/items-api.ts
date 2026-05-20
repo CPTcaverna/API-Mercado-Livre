@@ -3,8 +3,16 @@ import type { CategoryAttributesResponse } from '../types/category-attribute'
 import type { PredictCategoryResponse } from '../types/category'
 import type { CreateItemPayload, Item, UpdateItemPayload } from '../types/item'
 import type { ItemListFilters } from '../types/item-filters'
+import {
+  ITEM_LIST_PAGE_SIZE,
+  type ItemListResponse,
+} from '../types/item-list'
 
-export async function fetchItems(filters: ItemListFilters) {
+export async function fetchItems(
+  filters: ItemListFilters,
+  page = 1,
+  pageSize = ITEM_LIST_PAGE_SIZE,
+) {
   const params = new URLSearchParams()
   const term = filters.q.trim()
   if (term) params.set('q', term)
@@ -14,9 +22,10 @@ export async function fetchItems(filters: ItemListFilters) {
   if (filters.status !== 'all') params.set('status', filters.status)
   if (filters.stock !== 'all') params.set('stock', filters.stock)
   if (filters.sort !== 'newest') params.set('sort', filters.sort)
+  params.set('page', String(page))
+  params.set('limit', String(pageSize))
   const qs = params.toString()
-  const data = await apiJson<{ items: Item[] }>(`/items${qs ? `?${qs}` : ''}`)
-  return data.items
+  return apiJson<ItemListResponse>(`/items?${qs}`)
 }
 
 export async function predictCategoryFromTitle(title: string, site = 'MLB') {
