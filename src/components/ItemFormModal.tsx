@@ -7,6 +7,7 @@ import {
   resolveCategoryAttributes,
   updateItem,
 } from '../lib/items-api'
+import { uploadItemImage } from '../lib/media-api'
 import {
   formatAttributeValueForMl,
   getAttributeValidationMessage,
@@ -19,6 +20,7 @@ import type {
 import type { Item } from '../types/item'
 import Button from './Button'
 import { CategoryAttributeFields } from './CategoryAttributeFields'
+import { ItemImageUpload } from './ItemImageUpload'
 import { FieldLabel } from './FieldLabel'
 import Input from './Input'
 import { Modal } from './Modal'
@@ -62,7 +64,7 @@ export function ItemFormModal({
   const [quantity, setQuantity] = useState('')
   const [condition, setCondition] = useState<'new' | 'used' | 'not_specified'>('new')
   const [listingTypeId, setListingTypeId] = useState('silver')
-  const [pictureUrl, setPictureUrl] = useState('')
+  const [pictureFile, setPictureFile] = useState<File | null>(null)
   const [requiredAttributes, setRequiredAttributes] = useState<CategoryAttribute[]>(
     [],
   )
@@ -92,6 +94,7 @@ export function ItemFormModal({
       setTitle(item.title)
       setPrice(String(item.price))
       setQuantity(String(item.availableQty))
+      setPictureFile(null)
     } else if (!isEdit) {
       setTitle('')
       setCategoryId('')
@@ -100,7 +103,7 @@ export function ItemFormModal({
       setQuantity('')
       setCondition('new')
       setListingTypeId('silver')
-      setPictureUrl('')
+      setPictureFile(null)
       setRequiredAttributes([])
       setAttributeValues({})
     }
@@ -258,11 +261,16 @@ export function ItemFormModal({
       const parsedQty = Number(quantity)
 
       if (isEdit && item) {
-        await updateItem(item.id, {
+        const updatePayload: Parameters<typeof updateItem>[1] = {
           title: title.trim(),
           price: parsedPrice,
           available_quantity: parsedQty,
-        })
+        }
+        if (pictureFile) {
+          const { url } = await uploadItemImage(pictureFile)
+          updatePayload.pictures = [{ source: url }]
+        }
+        await updateItem(item.id, updatePayload)
       } else {
         if (!categoryId.trim()) {
           setError('Clique em "Prever categoria" após preencher o título.')
@@ -289,6 +297,12 @@ export function ItemFormModal({
           setSubmitting(false)
           return
         }
+        if (!pictureFile) {
+          setError('Selecione uma imagem do produto.')
+          setSubmitting(false)
+          return
+        }
+        const { url: imageUrl } = await uploadItemImage(pictureFile)
         await createItem({
           title: title.trim(),
           category_id: categoryId.trim(),
@@ -296,7 +310,7 @@ export function ItemFormModal({
           available_quantity: parsedQty,
           condition,
           listing_type_id: listingTypeId,
-          pictures: [{ source: pictureUrl.trim() }],
+          pictures: [{ source: imageUrl }],
           attributes: buildAttributesPayload(),
         })
       }
@@ -446,26 +460,29 @@ export function ItemFormModal({
             )}
 
             <div>
-              <FieldLabel hint="HTTPS, domínio público, sem login">Foto (URL)</FieldLabel>
-              <Input
-                type="url"
-                value={pictureUrl}
-                onChange={(e) => setPictureUrl(e.target.value)}
-                placeholder="https://http2.mlstatic.com/..."
+              <FieldLabel>Foto do produto</FieldLabel>
+              <ItemImageUpload
+                file={pictureFile}
+                onFileChange={setPictureFile}
+                disabled={submitting}
                 required
               />
-              <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
-                Use uma URL de imagem em <strong>domínio público na internet</strong> (HTTPS).
-                O Mercado Livre baixa a foto dos servidores deles — links locais, Google Drive
-                com restrição ou páginas que exigem login <strong>não funcionam</strong>.
-                Recomendado: PNG ou JPEG, pelo menos 500×500 px.
-              </p>
             </div>
           </>
         )}
 
-        {isEdit && (
-          <div className="grid gap-4 sm:grid-cols-2">
+        {isEdit && item && (
+          <>
+            <div>
+              <FieldLabel>Foto do produto</FieldLabel>
+              <ItemImageUpload
+                file={pictureFile}
+                onFileChange={setPictureFile}
+                currentImageUrl={item.thumbnail}
+                disabled={submitting}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <FieldLabel>Preço (R$)</FieldLabel>
               <Input
@@ -488,6 +505,7 @@ export function ItemFormModal({
               />
             </div>
           </div>
+          </>
         )}
 
         {error && (
