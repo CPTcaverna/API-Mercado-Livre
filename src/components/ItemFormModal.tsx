@@ -45,7 +45,7 @@ const FORM_CONTROL_CLASS =
   'mt-1 box-border h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/40'
 
 const PRICE_GROUP_CLASS =
-  'mt-1 box-border flex h-10 w-full overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-500/40'
+  'mt-2 box-border flex h-10 w-full overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-500/40'
 
 export function ItemFormModal({
   open,
